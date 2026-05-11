@@ -1434,10 +1434,9 @@
                 // Token is valid
                 renderUserSection(userEmail);
                 showProfilesUI();
-                // Load cached data immediately - NO automatic sync
                 await loadStoredProfiles();
-                // User must click sync button to update data
-                updateSyncButton(true); // Enable sync button
+                // Automatically sync locations from Google Business Profile API
+                fetchLocations();
             } else if (refreshToken) {
                 // Token expired, try to refresh
                 try {
@@ -1445,7 +1444,6 @@
                     renderUserSection(userEmail);
                     showProfilesUI();
                     await loadStoredProfiles();
-                    updateSyncButton(true);
                 } catch (error) {
                     // Refresh failed, show login
                     renderLoginButton();
@@ -1771,7 +1769,6 @@
                 renderProfiles();
                 updateStats();
                 updateMetricsCards();
-                updateSyncButton(true);
                 showToast(`Se sincronizaron ${profiles.length} ubicaciones`, 'success');
 
             } catch (error) {
@@ -2266,9 +2263,9 @@ async function fetchReviewsAndRatings(locations, accounts) {
             
             showToast('Obteniendo estado de verificación...', 'info');
             
-            // Optimized batch settings - balanced for 300 QPM limit (user uses ~52%)
-            const BATCH_SIZE = 8;
-            const DELAY_BETWEEN_BATCHES = 500; // 500ms between batches (optimized)
+            // Moderate batch settings - balanced for 300 QPM limit
+            const BATCH_SIZE = 5;
+            const DELAY_BETWEEN_BATCHES = 1000; // 1 second between batches
             let processed = 0;
             let verified = 0;
             let unverified = 0;
@@ -2461,20 +2458,6 @@ async function fetchReviewsAndRatings(locations, accounts) {
                 return '<span class="alert-badge warning" title="Rating bajo">⚠️</span>';
             } else {
                 return '<span class="alert-badge ok" title="OK">✓</span>';
-            }
-        }
-
-        // Update sync button state
-        function updateSyncButton(hasCachedData) {
-            const btn = document.getElementById('refreshLocationsBtn');
-            if (btn) {
-                if (hasCachedData && profiles.length > 0) {
-                    btn.title = `Sincronizar (${profiles.length} ubicaciones en caché)`;
-                    btn.style.opacity = '1';
-                } else {
-                    btn.title = 'Sincronizar ubicaciones';
-                    btn.style.opacity = '1';
-                }
             }
         }
 
