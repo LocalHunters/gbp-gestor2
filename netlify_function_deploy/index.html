@@ -1432,6 +1432,9 @@
 
             if (accessToken && tokenExpiry && new Date().getTime() < parseInt(tokenExpiry)) {
                 // Token is valid
+                console.log('=== TOKEN VÁLIDO ===');
+                console.log('Email:', userEmail);
+                console.log('Expiry:', new Date(parseInt(tokenExpiry)).toLocaleString());
                 renderUserSection(userEmail);
                 showProfilesUI();
                 // Load cached data immediately - NO automatic sync
@@ -1481,19 +1484,24 @@
 
         // Handle OAuth Callback
         async function handleOAuthCallback() {
+            console.log('=== handleOAuthCallback EJECUTÁNDOSE ===');
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
             const storedState = localStorage.getItem('gbp_oauth_state');
 
-            if (code && state === storedState) {
-                // Clear state
+            console.log('URL params:', window.location.search);
+            console.log('Code recibido:', code ? 'SÍ (largo: ' + code.length + ')' : 'NO');
+            console.log('State URL:', state ? state.substring(0, 10) + '...' : 'NO');
+            console.log('StoredState:', storedState ? storedState.substring(0, 10) + '...' : 'NO');
+            
+            if (code && state && storedState && state === storedState) {
+                console.log('=== CONDICIONES PASADAS, INTERCAMBIANDO TOKENS ===');
                 localStorage.removeItem('gbp_oauth_state');
 
                 try {
                     showToast('Autenticando...', 'info');
 
-                    // Exchange code for tokens
                     const response = await fetch('https://oauth2.googleapis.com/token', {
                         method: 'POST',
                         headers: {
@@ -1508,41 +1516,43 @@
                         })
                     });
 
+                    console.log('Response status:', response.status);
+
                     if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Error token:', errorText);
                         throw new Error('Error al obtener tokens');
                     }
 
                     const tokens = await response.json();
+                    console.log('Tokens recibidos, expires_in:', tokens.expires_in);
 
-                    // Store tokens
                     storeTokens(tokens);
+                    const accessToken = tokens.access_token.trim();
+                    localStorage.setItem('gbp_access_token', accessToken);
+                    console.log('Token guardado');
 
-                    // Get user email - make it optional, proceed even if it fails
-                    try {
-                        const accessToken = tokens.access_token.trim();
-                        localStorage.setItem('gbp_access_token', accessToken);
-                        
-                        // Try to get user info, but don't fail if it doesn't work
-                        const userInfo = await getUserInfoDirect(accessToken);
-                        if (userInfo && userInfo.email) {
-                            localStorage.setItem('gbp_user_email', userInfo.email);
-                        }
-                    } catch (userInfoError) {
-                        console.warn('Could not get user info, but tokens are stored:', userInfoError);
-                        // Continue anyway - we have the tokens
+                    const userInfo = await getUserInfoDirect(accessToken);
+                    if (userInfo && userInfo.email) {
+                        localStorage.setItem('gbp_user_email', userInfo.email);
+                        console.log('Email guardado:', userInfo.email);
                     }
 
-                    // Clean URL
                     window.history.replaceState({}, document.title, window.location.pathname);
-
-                    // Update UI
+                    console.log('Llamando checkAuthStatus...');
                     checkAuthStatus();
                     showToast('¡Inicio de sesión exitoso!', 'success');
+                    console.log('=== LOGIN COMPLETADO ===');
 
                 } catch (error) {
                     console.error('OAuth error:', error);
-                    showToast('Error en autenticación: ' + error.message, 'error');
+                    showToast('Error: ' + error.message, 'error');
                 }
+            } else {
+                console.log('NO SE CUMPLEN CONDICIONES - code:', !!code, 'state:', !!state, 'storedState:', !!storedState, 'iguales:', state === storedState);
+                console.log('Redirigiendo a página principal...');
+                // If no valid OAuth callback, check existing auth
+                checkAuthStatus();
             }
         }
 
@@ -1899,15 +1909,23 @@ async function fetchReviewsAndRatings(locations, accounts) {
 
         // Load Stored Profiles
         async function loadStoredProfiles() {
+            console.log('=== CARGANDO PERFILES DESDE CACHÉ ===');
             try {
                 const storedProfiles = localStorage.getItem('gbp_profiles');
+                console.log('Datos en localStorage:', storedProfiles ? 'SÍ (' + storedProfiles.length + ' bytes)' : 'NO');
+                
                 if (storedProfiles) {
                     profiles = JSON.parse(storedProfiles);
+                    console.log('Perfiles cargados:', profiles.length);
                     
                     // Calculate totals for metrics cards
                     updateMetricsCards();
                     renderProfiles();
                     updateStats();
+                    console.log('=== PERFILES MOSTRADOS ===');
+                } else {
+                    console.log('No hay perfiles en caché - usuario debe sincronizar');
+                    showToast('No hay datos guardados. Haz clic en sincronizar para obtenerlos.', 'info');
                 }
             } catch (e) {
                 console.error('Error loading profiles:', e);
